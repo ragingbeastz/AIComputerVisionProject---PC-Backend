@@ -3,12 +3,13 @@ from fastapi.responses import JSONResponse
 from io import BytesIO
 from PIL import Image, ImageDraw, ImageFont
 import base64
+import uvicorn
 
 import temp_image_processing as temp_imageprocess_image
 
 
 
-API_KEY = ""
+API_KEY = "abcdefg"
 
 backend = FastAPI()
 
@@ -43,3 +44,7 @@ Interior Features: The Mk6 Fiesta features Ford's Convers+ menu system and steer
         "car_info": car_info,
         "image_base64": f"data:image/jpeg;base64,{b64_img}"
     })
+
+
+if __name__ == "__main__":
+    uvicorn.run(backend, host="0.0.0.0", port=8000)
