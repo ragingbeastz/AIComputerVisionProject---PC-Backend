@@ -11,7 +11,16 @@ import pandas as pd
 from tensorflow.keras.applications.efficientnet import EfficientNetB3, preprocess_input, decode_predictions
 import temp_image_processing as temp_imageprocess_image
 from transformers import pipeline
+import requests
 
+
+
+with open("auth.txt", "r") as f:
+    lines = f.read().splitlines()
+    google_API_KEY = lines[0]
+    google_CX = lines[1]
+
+googleSearch_url = "https://www.googleapis.com/customsearch/v1"
 
 
 API_KEY = "abcdefg"
@@ -89,13 +98,27 @@ async def identifyCar(file: UploadFile = File(...), x_api_key: str = Header(None
     car_info = out[0]["generated_text"]
 
     #Get Image
-    
+    params = {
+        "q": f"{car_colour} {car_year} {car_make} {car_model}",
+        "cx": google_CX,
+        "key": google_API_KEY,
+        "searchType": "image",
+        "num": 1, 
+    }
+    response = requests.get(googleSearch_url, params=params).json()
+    first_image_url = response["items"][0]["link"]
+
+    google_image_base64 = None
+    if first_image_url:
+        img_response = requests.get(first_image_url)
+        if img_response.status_code == 200:
+            google_image_base64 = base64.b64encode(img_response.content).decode()
 
 
     return JSONResponse({
         "result": result,
         "car_info": car_info,
-        "image_base64": f"data:image/jpeg;base64,{b64_img}"
+        "image_base64": f"data:image/jpeg;base64,{google_image_base64}" if google_image_base64 else None
     })
 
 
