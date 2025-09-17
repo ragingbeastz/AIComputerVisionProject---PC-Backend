@@ -10,6 +10,7 @@ import tensorflow as tf
 import pandas as pd
 from tensorflow.keras.applications.efficientnet import EfficientNetB3, preprocess_input, decode_predictions
 import temp_image_processing as temp_imageprocess_image
+from transformers import pipeline
 
 
 
@@ -76,11 +77,20 @@ async def identifyCar(file: UploadFile = File(...), x_api_key: str = Header(None
     b64_img = base64.b64encode(out_buf.getvalue()).decode()
 
     #Get Text
-    car_info = """The 2010 Ford Fiesta is a popular choice in the used car market, particularly known for its fun-to-drive nature and strong safety ratings. 
-Engines: Available with a range of petrol and diesel engines, including 1.25L, 1.4L, and 1.6L petrol options and 1.4L and 1.6L TDCi diesels.
-Driving Dynamics: Praised for its precise steering and agile chassis, making it enjoyable to drive. The suspension effectively handles bumps, providing a comfortable ride.
-Safety: Received a five-star Euro NCAP crash test rating. Standard safety features include dual front, side and driver's knee airbags, seatbelt pre-tensioners, all-round three-point seatbelts, and ISOFIX child-seat mounting points. Optional safety features like Emergency City Stop and Ford's MyKey system, which allows parents to set speed and volume limits for young drivers, are also available.
-Interior Features: The Mk6 Fiesta features Ford's Convers+ menu system and steering wheel controls. Other features include keyless entry (with a "Ford Power" starter button), adjustable steering wheel, electric power steering, and a USB port. """
+    generator = pipeline("text-generation", model="google/gemma-2-2b-it")
+    prompt = f"Write a detailed description of the {car_year} {car_make} {car_model}, including key features, safety, and driving experience."
+    out = generator(
+        prompt,
+        max_new_tokens=1000,
+        do_sample=True,
+        temperature=0.7,
+        return_full_text=False
+    )
+    car_info = out[0]["generated_text"]
+
+    #Get Image
+    
+
 
     return JSONResponse({
         "result": result,
