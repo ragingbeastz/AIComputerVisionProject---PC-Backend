@@ -4,13 +4,16 @@ from io import BytesIO
 from PIL import Image, ImageDraw, ImageFont
 import base64
 import uvicorn
-
+import numpy as np
+from PIL import Image
+import tensorflow as tf
+import pandas as pd
+from tensorflow.keras.applications.efficientnet import EfficientNetB3, preprocess_input, decode_predictions
 import temp_image_processing as temp_imageprocess_image
 
 
 
 API_KEY = "abcdefg"
-
 backend = FastAPI()
 
 @backend.post("/process")
@@ -22,9 +25,50 @@ async def identifyCar(file: UploadFile = File(...), x_api_key: str = Header(None
     img_bytes = await file.read()
     img = Image.open(BytesIO(img_bytes)).convert("RGB")
 
-    #Process Image
+    # Pre-process Image
     img = temp_imageprocess_image.process_image(img)
     img = Image.fromarray(img)
+
+    x = np.array(img, dtype=np.float32)
+    x = np.expand_dims(x, axis=0)  
+    x = preprocess_input(x)   
+
+
+    # Load Models and Predict
+
+    #Car Colour
+    colour_model = tf.keras.models.load_model(r"C:\Users\Dimithri\Documents\Model Training Computer Vision\Models\model_colours.keras")
+    colour_labels = pd.read_csv(r"C:\Users\Dimithri\Documents\Model Training Computer Vision\Models\labels_colours.csv")
+
+    preds_colour = colour_model.predict(x)
+    top_colour = tf.keras.applications.efficientnet.decode_predictions(preds_colour, top=1)[0][0]
+    car_colour = colour_labels.iloc[top_colour[0]]['label']
+
+    # Car Make
+    make_model = tf.keras.models.load_model(r"C:\Users\Dimithri\Documents\Model Training Computer Vision\Models\model_car_make.keras")
+    make_labels = pd.read_csv(r"C:\Users\Dimithri\Documents\Model Training Computer Vision\Models\labels_car_make.csv")
+
+    preds_make = make_model.predict(x)
+    top_make = tf.keras.applications.efficientnet.decode_predictions(preds_make, top=1)[0][0]
+    car_make = make_labels.iloc[top_make[0]]['label']
+
+    # Car Model
+    model_model = tf.keras.models.load_model(rf"C:\Users\Dimithri\Documents\Model Training Computer Vision\Models\model_car_model_{car_make}.keras")
+    model_labels = pd.read_csv(rf"C:\Users\Dimithri\Documents\Model Training Computer Vision\Models\labels_car_model_{car_make}.csv")
+
+    preds_model = model_model.predict(x)
+    top_model = tf.keras.applications.efficientnet.decode_predictions(preds_model, top=1)[0][0]
+    car_model = model_labels.iloc[top_model[0]]['label']
+
+    # Car Year
+    year_model = tf.keras.models.load_model(rf"C:\Users\Dimithri\Documents\Model Training Computer Vision\Models\model_car_year_{car_make}_{car_model}.keras")  
+    year_labels = pd.read_csv(rf"C:\Users\Dimithri\Documents\Model Training Computer Vision\Models\labels_car_year_{car_make}_{car_model}.csv")
+
+    preds_year = year_model.predict(x)
+    top_year = tf.keras.applications.efficientnet.decode_predictions(preds_year, top=1)[0][0]
+    car_year = year_labels.iloc[top_year[0]]['label']
+
+    result = f"{car_colour} {car_make} {car_model} {car_year}"
 
     # Encode image to base64 for JSON
     out_buf = BytesIO()
@@ -32,7 +76,6 @@ async def identifyCar(file: UploadFile = File(...), x_api_key: str = Header(None
     b64_img = base64.b64encode(out_buf.getvalue()).decode()
 
     #Get Text
-    car_make = "Ford Fiesta 2010"  # placeholder
     car_info = """The 2010 Ford Fiesta is a popular choice in the used car market, particularly known for its fun-to-drive nature and strong safety ratings. 
 Engines: Available with a range of petrol and diesel engines, including 1.25L, 1.4L, and 1.6L petrol options and 1.4L and 1.6L TDCi diesels.
 Driving Dynamics: Praised for its precise steering and agile chassis, making it enjoyable to drive. The suspension effectively handles bumps, providing a comfortable ride.
@@ -40,7 +83,7 @@ Safety: Received a five-star Euro NCAP crash test rating. Standard safety featur
 Interior Features: The Mk6 Fiesta features Ford's Convers+ menu system and steering wheel controls. Other features include keyless entry (with a "Ford Power" starter button), adjustable steering wheel, electric power steering, and a USB port. """
 
     return JSONResponse({
-        "car_make": car_make,
+        "result": result,
         "car_info": car_info,
         "image_base64": f"data:image/jpeg;base64,{b64_img}"
     })
